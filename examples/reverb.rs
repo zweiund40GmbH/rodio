@@ -1,6 +1,7 @@
 use rodio::Source;
 use std::io::BufReader;
 use std::time::Duration;
+use rodio::OutputStreamTrait;
 
 fn main() {
     let (_stream, handle) = rodio::OutputStream::try_default().unwrap();

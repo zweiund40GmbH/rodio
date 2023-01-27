@@ -1,6 +1,7 @@
 use rodio::source::{SineWave, Source};
 use rodio::{dynamic_mixer, OutputStream, Sink};
 use std::time::Duration;
+use rodio::OutputStreamTrait;
 
 fn main() {
     // Construct a dynamic controller and mixer, stream_handle, and sink.

@@ -18,8 +18,14 @@ lewton = { version = "0.10", optional = true }
 minimp3 = { version = "0.5.0", optional = true }
 symphonia = {version = "0.5.2", optional = true }
 
+gst = { package = "gstreamer", version="0.18", optional = true }
+gst-base = { package = "gstreamer-base", version="0.18", optional = true }
+gst-app = { package = "gstreamer-app", version="0.18", optional = true }
+gst-audio = { package = "gstreamer-audio", version="0.18", optional = true }
+byte-slice-cast = "1.2.2"
+
 [features]
-default = ["flac", "vorbis", "wav", "mp3"]
+default = ["flac", "vorbis", "wav", "mp3", "gstreamer"]
 
 flac = ["claxon"]
 vorbis = ["lewton"]
@@ -34,6 +40,7 @@ symphonia-isomp4 = ["symphonia/isomp4"]
 symphonia-mp3 = ["symphonia/mp3"]
 symphonia-vorbis = ["symphonia/vorbis"]
 symphonia-wav = ["symphonia/wav", "symphonia/pcm", "symphonia/adpcm"]
+gstreamer = ["gst", "gst-base", "gst-app", "gst-audio"]
 
 [dev-dependencies]
 quickcheck = "0.9.2"

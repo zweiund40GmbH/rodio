@@ -119,6 +119,12 @@ mod sink;
 mod spatial_sink;
 mod stream;
 
+#[cfg(feature = "gstreamer")]
+mod gst_stream;
+
+#[cfg(feature = "gstreamer")]
+pub use crate::gst_stream::GstOutputStream;
+
 pub mod buffer;
 pub mod decoder;
 pub mod dynamic_mixer;
@@ -131,4 +137,4 @@ pub use crate::decoder::Decoder;
 pub use crate::sink::Sink;
 pub use crate::source::Source;
 pub use crate::spatial_sink::SpatialSink;
-pub use crate::stream::{OutputStream, OutputStreamHandle, PlayError, StreamError};
+pub use crate::stream::{OutputStreamTrait, OutputStream, OutputStreamHandle, PlayError, StreamError};

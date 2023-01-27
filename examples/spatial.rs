@@ -3,6 +3,7 @@ use std::thread;
 use std::time::Duration;
 
 use rodio::Source;
+use rodio::OutputStreamTrait;
 
 fn main() {
     let iter_duration = Duration::from_secs(5);

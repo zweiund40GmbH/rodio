@@ -10,6 +10,13 @@ use crate::source::Source;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{Sample, SupportedStreamConfig};
 
+
+pub trait OutputStreamTrait {
+    type SelfHandle;
+    type OutputDevice;
+    fn try_default() -> Result<(Self::SelfHandle, OutputStreamHandle), StreamError>; 
+    fn try_from_device(device: &Self::OutputDevice) -> Result<(Self::SelfHandle, OutputStreamHandle), StreamError>; 
+}
 /// `cpal::Stream` container. Also see the more useful `OutputStreamHandle`.
 ///
 /// If this is dropped playback will end & attached `OutputStreamHandle`s will no longer work.
@@ -18,10 +25,43 @@ pub struct OutputStream {
     _stream: cpal::Stream,
 }
 
+impl OutputStreamTrait for OutputStream {
+    type SelfHandle = Self;
+    type OutputDevice = cpal::Device;
+
+    fn try_default() -> Result<(Self::SelfHandle, OutputStreamHandle), StreamError> {
+        let default_device = cpal::default_host()
+        .default_output_device()
+        .ok_or(StreamError::NoDevice)?;
+
+        let default_stream = Self::try_from_device(&default_device);
+
+        default_stream.or_else(|original_err| {
+            // default device didn't work, try other ones
+            let mut devices = match cpal::default_host().output_devices() {
+                Ok(d) => d,
+                Err(_) => return Err(original_err),
+            };
+
+            devices
+                .find_map(|d| Self::try_from_device(&d).ok())
+                .ok_or(original_err)
+        }) 
+    } 
+
+    fn try_from_device(
+        device: &cpal::Device,
+    ) -> Result<(Self, OutputStreamHandle), StreamError> {
+        let default_config = device.default_output_config()?;
+        OutputStream::try_from_device_config(device, default_config)
+    }
+
+}
+
 /// More flexible handle to a `OutputStream` that provides playback.
 #[derive(Clone)]
 pub struct OutputStreamHandle {
-    mixer: Weak<DynamicMixerController<f32>>,
+    pub(crate) mixer: Weak<DynamicMixerController<f32>>,
 }
 
 impl OutputStream {
@@ -51,28 +91,6 @@ impl OutputStream {
         Ok((out, handle))
     }
 
-    /// Return a new stream & handle using the default output device.
-    ///
-    /// On failure will fallback to trying any non-default output devices.
-    pub fn try_default() -> Result<(Self, OutputStreamHandle), StreamError> {
-        let default_device = cpal::default_host()
-            .default_output_device()
-            .ok_or(StreamError::NoDevice)?;
-
-        let default_stream = Self::try_from_device(&default_device);
-
-        default_stream.or_else(|original_err| {
-            // default device didn't work, try other ones
-            let mut devices = match cpal::default_host().output_devices() {
-                Ok(d) => d,
-                Err(_) => return Err(original_err),
-            };
-
-            devices
-                .find_map(|d| Self::try_from_device(&d).ok())
-                .ok_or(original_err)
-        })
-    }
 }
 
 impl OutputStreamHandle {

@@ -1,5 +1,6 @@
 //! Plays a tone alternating between right and left ears, with right being first.
 use std::io::BufReader;
+use rodio::OutputStreamTrait;
 
 fn main() {
     let (_stream, handle) = rodio::OutputStream::try_default().unwrap();
