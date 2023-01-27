@@ -1,12 +1,11 @@
 use std::io::BufReader;
 use gst::prelude::*;
-use gst_app::{prelude::*, AppSrc};
 
 use rodio::OutputStreamTrait;
 
 fn main() {
 
-    gst::init();
+    let _ = gst::init();
 
     let pipeline = gst::Pipeline::new(Some("pipe"));
 
@@ -20,6 +19,7 @@ fn main() {
     let src = gst::ElementFactory::make("appsrc", None).unwrap();
     src.set_property("is-live", &true);
     src.set_property("block", &false);
+    src.set_property("format", &gst::Format::Time);
     src.set_property("caps", &maincaps);
 
     let audioconvert = gst::ElementFactory::make("audioconvert", None).unwrap();

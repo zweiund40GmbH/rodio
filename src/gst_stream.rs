@@ -1,12 +1,7 @@
-use std::io::{Read, Seek};
-use std::marker::Sync;
-use std::sync::{Arc, Weak};
-use std::{error, fmt};
+use std::sync::Arc;
 use crate::dynamic_mixer::{self, DynamicMixerController};
 
 use crate::stream::{OutputStreamHandle, StreamError, OutputStreamTrait};
-use gst::prelude::*;
-use gst_app::prelude::*;
 use byte_slice_cast::AsMutSliceOf;
 
 /// `cpal::Stream` container. Also see the more useful `OutputStreamHandle`.
