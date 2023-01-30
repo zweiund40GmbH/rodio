@@ -25,7 +25,7 @@ gst-audio = { package = "gstreamer-audio", version="0.18", optional = true }
 byte-slice-cast = "1.2.2"
 
 [features]
-default = ["flac", "vorbis", "wav", "mp3", "gstreamer"]
+default = ["flac", "vorbis", "wav", "minimp3", "gstreamer"]
 
 flac = ["claxon"]
 vorbis = ["lewton"]
