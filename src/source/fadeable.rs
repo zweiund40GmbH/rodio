@@ -97,28 +97,29 @@ where
             self.remaining_ns = self.total_ns;
             self.current_direction = self.direction.load(std::sync::atomic::Ordering::SeqCst);
         } 
-
-        if self.remaining_ns <= 0.0 && (self.f >= 1.0 || self.f <= 0.0) {
-            return self.input.next().map(|value| value.amplify(self.f)) 
-        }
-
         // default is going lowwer
-        let factor = if self.current_direction == FadeDirection::Out as u8 {
-            self.remaining_ns / self.total_ns
+
+        if self.remaining_ns < 0.0 {
+            self.f = if self.current_direction == FadeDirection::Out as u8 {
+                0.0
+            } else {
+                1.0
+            }; 
+            return self.input.next().map(|value| value.amplify(self.f)) 
         } else {
-            1.0 - self.remaining_ns / self.total_ns
-        };
+            let factor = if self.current_direction == FadeDirection::Out as u8 {
+                self.remaining_ns / self.total_ns
+            } else {
+                1.0 - self.remaining_ns / self.total_ns
+            };
 
-        if factor < 0.0 {
-            self.f = 0.0;
-        }
-        if factor > 1.0 {
-            self.f = 1.0;
+            if self.remaining_ns > 0.0 {
+                self.remaining_ns -=
+                    1000000000.0 / (self.input.sample_rate() as f32 * self.channels() as f32);
+            }
+            self.input.next().map(|value| value.amplify(factor))
         }
 
-        self.remaining_ns -=
-            1000000000.0 / (self.input.sample_rate() as f32 * self.channels() as f32);
-        self.input.next().map(|value| value.amplify(self.f))
     }
 
     #[inline]

@@ -16,7 +16,7 @@ fn main() {
 
     let s = source.fadeable(std::time::Duration::from_secs(1));
     let fader = s.1;
-    sink.append(s.0.repeat_infinite());
+    sink.append(s.0.repeat_infinite().amplify(1.0));
 
     std::thread::sleep(std::time::Duration::from_secs(2));
     fader.change_direction(FadeDirection::Out);
