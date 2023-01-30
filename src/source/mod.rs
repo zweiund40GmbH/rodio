@@ -1,6 +1,8 @@
 //! Sources of sound and various filters.
 
 use std::time::Duration;
+use std::sync::mpsc::Receiver;
+use std::sync::Arc;
 
 use crate::Sample;
 
@@ -12,7 +14,9 @@ pub use self::crossfade::Crossfade;
 pub use self::delay::Delay;
 pub use self::done::Done;
 pub use self::empty::Empty;
+use self::fadeable::AtomicFadeDirection;
 pub use self::fadein::FadeIn;
+pub use self::fadeable::{FadeDirection, Fadeable};
 pub use self::from_factory::{from_factory, FromFactoryIter};
 pub use self::from_iter::{from_iter, FromIter};
 pub use self::mix::Mix;
@@ -38,6 +42,7 @@ mod delay;
 mod done;
 mod empty;
 mod fadein;
+mod fadeable;
 mod from_factory;
 mod from_iter;
 mod mix;
@@ -236,6 +241,13 @@ where
         Self: Sized,
     {
         fadein::fadein(self, duration)
+    }
+
+    fn fadeable(self, duration: Duration) -> (Fadeable<Self>, AtomicFadeDirection)
+    where
+        Self: Sized,
+    {
+        fadeable::fadeable(self, duration)
     }
 
     /// Calls the `access` closure on `Self` the first time the source is iterated and every
