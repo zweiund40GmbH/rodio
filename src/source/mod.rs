@@ -16,7 +16,7 @@ pub use self::done::Done;
 pub use self::empty::Empty;
 use self::fadeable::AtomicFadeDirection;
 pub use self::fadein::FadeIn;
-pub use self::fadeable::{FadeDirection, Fadeable};
+pub use self::fadeable::{FadeDirection, Fadeable, AtomicFadeDirection};
 pub use self::from_factory::{from_factory, FromFactoryIter};
 pub use self::from_iter::{from_iter, FromIter};
 pub use self::mix::Mix;
