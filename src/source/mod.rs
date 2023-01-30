@@ -1,8 +1,6 @@
 //! Sources of sound and various filters.
 
 use std::time::Duration;
-use std::sync::mpsc::Receiver;
-use std::sync::Arc;
 
 use crate::Sample;
 
@@ -14,7 +12,6 @@ pub use self::crossfade::Crossfade;
 pub use self::delay::Delay;
 pub use self::done::Done;
 pub use self::empty::Empty;
-use self::fadeable::AtomicFadeDirection;
 pub use self::fadein::FadeIn;
 pub use self::fadeable::{FadeDirection, Fadeable, AtomicFadeDirection};
 pub use self::from_factory::{from_factory, FromFactoryIter};
