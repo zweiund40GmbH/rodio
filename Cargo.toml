@@ -18,10 +18,10 @@ lewton = { version = "0.10", optional = true }
 minimp3 = { version = "0.5.0", optional = true }
 symphonia = {version = "0.5.2", optional = true }
 
-gst = { package = "gstreamer", version="0.18", optional = true }
-gst-base = { package = "gstreamer-base", version="0.18", optional = true }
-gst-app = { package = "gstreamer-app", version="0.18", optional = true }
-gst-audio = { package = "gstreamer-audio", version="0.18", optional = true }
+gst = { package = "gstreamer", version="0.20", optional = true }
+gst-base = { package = "gstreamer-base", version="0.20", optional = true }
+gst-app = { package = "gstreamer-app", version="0.20", optional = true }
+gst-audio = { package = "gstreamer-audio", version="0.20", optional = true }
 byte-slice-cast = "1.2.2"
 
 [features]
