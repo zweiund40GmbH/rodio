@@ -5,6 +5,7 @@ use std::time::Duration;
 
 use crate::stream::{OutputStreamHandle, PlayError};
 use crate::{queue, source::Done, Sample, Source};
+use cpal::FromSample;
 
 /// Handle to an device that outputs sounds.
 ///
@@ -25,6 +26,8 @@ struct Controls {
     volume: Mutex<f32>,
     stopped: AtomicBool,
     speed: Mutex<f32>,
+    do_skip: AtomicBool,
+    to_clear: Mutex<u32>,
 }
 
 impl Sink {
@@ -49,6 +52,8 @@ impl Sink {
                 volume: Mutex::new(1.0),
                 stopped: AtomicBool::new(false),
                 speed: Mutex::new(1.0),
+                do_skip: AtomicBool::new(false),
+                to_clear: Mutex::new(0),
             }),
             sound_count: Arc::new(AtomicUsize::new(0)),
             detached: false,
@@ -61,29 +66,46 @@ impl Sink {
     pub fn append<S>(&self, source: S)
     where
         S: Source + Send + 'static,
-        S::Item: Sample,
-        S::Item: Send,
+        f32: FromSample<S::Item>,
+        S::Item: Sample + Send,
     {
+        // Wait for queue to flush then resume stopped playback
+        if self.controls.stopped.load(Ordering::SeqCst) {
+            if self.sound_count.load(Ordering::SeqCst) > 0 {
+                self.sleep_until_end();
+            }
+            self.controls.stopped.store(false, Ordering::SeqCst);
+        }
+
         let controls = self.controls.clone();
 
         let source = source
             .speed(1.0)
             .pausable(false)
             .amplify(1.0)
+            .skippable()
             .stoppable()
             .periodic_access(Duration::from_millis(5), move |src| {
                 if controls.stopped.load(Ordering::SeqCst) {
                     src.stop();
-                } else {
-                    src.inner_mut().set_factor(*controls.volume.lock().unwrap());
-                    src.inner_mut()
-                        .inner_mut()
-                        .set_paused(controls.pause.load(Ordering::SeqCst));
-                    src.inner_mut()
-                        .inner_mut()
-                        .inner_mut()
-                        .set_factor(*controls.speed.lock().unwrap());
                 }
+                if controls.do_skip.load(Ordering::SeqCst) {
+                    let _ = src.inner_mut().skip();
+                    let mut to_clear = controls.to_clear.lock().unwrap();
+                    if *to_clear == 1 {
+                        controls.do_skip.store(false, Ordering::SeqCst);
+                        *to_clear = 0;
+                    } else if *to_clear > 0 {
+                        *to_clear -= 1;
+                    }
+                }
+                let amp = src.inner_mut().inner_mut();
+                amp.set_factor(*controls.volume.lock().unwrap());
+                amp.inner_mut()
+                    .set_paused(controls.pause.load(Ordering::SeqCst));
+                amp.inner_mut()
+                    .inner_mut()
+                    .set_factor(*controls.speed.lock().unwrap());
             })
             .convert_samples();
         self.sound_count.fetch_add(1, Ordering::Relaxed);
@@ -152,6 +174,25 @@ impl Sink {
         self.controls.pause.load(Ordering::SeqCst)
     }
 
+    /// Removes all currently loaded `Source`s from the `Sink`, and pauses it.
+    ///
+    /// See `pause()` for information about pausing a `Sink`.
+    pub fn clear(&self) {
+        let len = self.sound_count.load(Ordering::SeqCst) as u32;
+        *self.controls.to_clear.lock().unwrap() = len;
+        self.skip_one();
+        self.pause();
+    }
+
+    /// Skips to the next `Source` in the `Sink`
+    ///
+    /// If there are more `Source`s appended to the `Sink` at the time,
+    /// it will play the next one. Otherwise, the `Sink` will finish as if
+    /// it had finished playing a `Source` all the way through.
+    pub fn skip_one(&self) {
+        self.controls.do_skip.store(true, Ordering::SeqCst);
+    }
+
     /// Stops the sink by emptying the queue.
     #[inline]
     pub fn stop(&self) {
@@ -200,6 +241,7 @@ impl Drop for Sink {
 mod tests {
     use crate::buffer::SamplesBuffer;
     use crate::{Sink, Source};
+    use std::sync::atomic::Ordering;
 
     #[test]
     fn test_pause_and_stop() {
@@ -230,6 +272,34 @@ mod tests {
         assert_eq!(queue_rx.next(), Some(0.0));
 
         assert_eq!(sink.empty(), true);
+    }
+
+    #[test]
+    fn test_stop_and_start() {
+        let (sink, mut queue_rx) = Sink::new_idle();
+
+        let v = vec![10i16, -10, 20, -20, 30, -30];
+
+        sink.append(SamplesBuffer::new(1, 1, v.clone()));
+        let mut src = SamplesBuffer::new(1, 1, v.clone()).convert_samples();
+
+        assert_eq!(queue_rx.next(), src.next());
+        assert_eq!(queue_rx.next(), src.next());
+
+        sink.stop();
+
+        assert!(sink.controls.stopped.load(Ordering::SeqCst));
+        assert_eq!(queue_rx.next(), Some(0.0));
+
+        src = SamplesBuffer::new(1, 1, v.clone()).convert_samples();
+        sink.append(SamplesBuffer::new(1, 1, v));
+
+        assert!(!sink.controls.stopped.load(Ordering::SeqCst));
+        // Flush silence
+        let mut queue_rx = queue_rx.skip_while(|v| *v == 0.0);
+
+        assert_eq!(queue_rx.next(), src.next());
+        assert_eq!(queue_rx.next(), src.next());
     }
 
     #[test]
