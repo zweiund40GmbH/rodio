@@ -1,5 +1,4 @@
 use std::io::{Read, Seek};
-use std::marker::Sync;
 use std::sync::{Arc, Weak};
 use std::{error, fmt};
 
@@ -70,7 +69,9 @@ impl OutputStream {
     pub fn try_from_device(
         device: &cpal::Device,
     ) -> Result<(Self, OutputStreamHandle), StreamError> {
-        let default_config = device.default_output_config()?;
+        let default_config = device
+            .default_output_config()
+            .map_err(StreamError::DefaultStreamConfigError)?;
         OutputStream::try_from_device_config(device, default_config)
     }
 
@@ -83,7 +84,7 @@ impl OutputStream {
         config: SupportedStreamConfig,
     ) -> Result<(Self, OutputStreamHandle), StreamError> {
         let (mixer, _stream) = device.try_new_output_stream_config(config)?;
-        _stream.play()?;
+        _stream.play().map_err(StreamError::PlayStreamError)?;
         let out = Self { mixer, _stream };
         let handle = OutputStreamHandle {
             mixer: Arc::downgrade(&out.mixer),
@@ -149,37 +150,22 @@ impl error::Error for PlayError {
     }
 }
 
+/// Errors that might occur when interfacing with audio output.
 #[derive(Debug)]
 pub enum StreamError {
+    /// Could not start playing the stream, see [cpal::PlayStreamError] for
+    /// details.
     PlayStreamError(cpal::PlayStreamError),
+    /// Failed to get the stream config for device the given device. See
+    /// [cpal::DefaultStreamConfigError] for details
     DefaultStreamConfigError(cpal::DefaultStreamConfigError),
+    /// Error opening stream with OS. See [cpal::BuildStreamError] for details
     BuildStreamError(cpal::BuildStreamError),
+    /// Could not list supported stream configs for device. Maybe it
+    /// disconnected, for details see: [cpal::SupportedStreamConfigsError].
     SupportedStreamConfigsError(cpal::SupportedStreamConfigsError),
+    /// Could not find any output device
     NoDevice,
-}
-
-impl From<cpal::DefaultStreamConfigError> for StreamError {
-    fn from(err: cpal::DefaultStreamConfigError) -> Self {
-        Self::DefaultStreamConfigError(err)
-    }
-}
-
-impl From<cpal::SupportedStreamConfigsError> for StreamError {
-    fn from(err: cpal::SupportedStreamConfigsError) -> Self {
-        Self::SupportedStreamConfigsError(err)
-    }
-}
-
-impl From<cpal::BuildStreamError> for StreamError {
-    fn from(err: cpal::BuildStreamError) -> Self {
-        Self::BuildStreamError(err)
-    }
-}
-
-impl From<cpal::PlayStreamError> for StreamError {
-    fn from(err: cpal::PlayStreamError) -> Self {
-        Self::PlayStreamError(err)
-    }
 }
 
 impl fmt::Display for StreamError {
@@ -227,7 +213,12 @@ impl CpalDeviceExt for cpal::Device {
         let (mixer_tx, mut mixer_rx) =
             dynamic_mixer::mixer::<f32>(format.channels(), format.sample_rate().0);
 
-        let error_callback = |err| eprintln!("an error occurred on output stream: {}", err);
+        let error_callback = |err| {
+            #[cfg(feature = "tracing")]
+            tracing::error!("an error occurred on output stream: {err}");
+            #[cfg(not(feature = "tracing"))]
+            eprintln!("an error occurred on output stream: {err}");
+        };
 
         match format.sample_format() {
             cpal::SampleFormat::F32 => self.build_output_stream::<f32, _, _>(
@@ -291,7 +282,7 @@ impl CpalDeviceExt for cpal::Device {
                         *d = mixer_rx
                             .next()
                             .map(Sample::from_sample)
-                            .unwrap_or(u8::max_value() / 2)
+                            .unwrap_or(u8::MAX / 2)
                     })
                 },
                 error_callback,
@@ -304,7 +295,7 @@ impl CpalDeviceExt for cpal::Device {
                         *d = mixer_rx
                             .next()
                             .map(Sample::from_sample)
-                            .unwrap_or(u16::max_value() / 2)
+                            .unwrap_or(u16::MAX / 2)
                     })
                 },
                 error_callback,
@@ -317,7 +308,7 @@ impl CpalDeviceExt for cpal::Device {
                         *d = mixer_rx
                             .next()
                             .map(Sample::from_sample)
-                            .unwrap_or(u32::max_value() / 2)
+                            .unwrap_or(u32::MAX / 2)
                     })
                 },
                 error_callback,
@@ -330,7 +321,7 @@ impl CpalDeviceExt for cpal::Device {
                         *d = mixer_rx
                             .next()
                             .map(Sample::from_sample)
-                            .unwrap_or(u64::max_value() / 2)
+                            .unwrap_or(u64::MAX / 2)
                     })
                 },
                 error_callback,
@@ -361,15 +352,18 @@ fn supported_output_formats(
 ) -> Result<impl Iterator<Item = cpal::SupportedStreamConfig>, StreamError> {
     const HZ_44100: cpal::SampleRate = cpal::SampleRate(44_100);
 
-    let mut supported: Vec<_> = device.supported_output_configs()?.collect();
+    let mut supported: Vec<_> = device
+        .supported_output_configs()
+        .map_err(StreamError::SupportedStreamConfigsError)?
+        .collect();
     supported.sort_by(|a, b| b.cmp_default_heuristics(a));
 
     Ok(supported.into_iter().flat_map(|sf| {
         let max_rate = sf.max_sample_rate();
         let min_rate = sf.min_sample_rate();
-        let mut formats = vec![sf.clone().with_max_sample_rate()];
+        let mut formats = vec![sf.with_max_sample_rate()];
         if HZ_44100 < max_rate && HZ_44100 > min_rate {
-            formats.push(sf.clone().with_sample_rate(HZ_44100))
+            formats.push(sf.with_sample_rate(HZ_44100))
         }
         formats.push(sf.with_sample_rate(min_rate));
         formats
