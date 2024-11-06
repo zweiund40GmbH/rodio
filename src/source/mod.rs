@@ -20,6 +20,7 @@ pub use self::empty::Empty;
 pub use self::empty_callback::EmptyCallback;
 pub use self::fadein::FadeIn;
 pub use self::fadeout::FadeOut;
+pub use self::fadeable::{FadeDirection, Fadeable, AtomicFadeDirection};
 pub use self::from_factory::{from_factory, FromFactoryIter};
 pub use self::from_iter::{from_iter, FromIter};
 pub use self::linear_ramp::LinearGainRamp;
@@ -53,6 +54,7 @@ mod empty;
 mod empty_callback;
 mod fadein;
 mod fadeout;
+mod fadeable;
 mod from_factory;
 mod from_iter;
 mod linear_ramp;
@@ -372,6 +374,14 @@ where
         Self: Sized,
     {
         fadeout::fadeout(self, duration)
+    }
+
+    #[inline]
+    fn fadeable(self, duration: Duration) -> (Fadeable<Self>, AtomicFadeDirection)
+    where
+        Self: Sized,
+    {
+        fadeable::fadeable(self, duration)
     }
 
     /// Applies a linear gain ramp to the sound.

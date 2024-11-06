@@ -7,7 +7,7 @@ use crate::dynamic_mixer::{self, DynamicMixerController};
 use crate::sink::Sink;
 use crate::source::Source;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
-use cpal::{Sample, SupportedStreamConfig};
+use cpal::{DefaultStreamConfigError, Sample, SupportedStreamConfig};
 
 
 pub trait OutputStreamTrait {
@@ -51,8 +51,12 @@ impl OutputStreamTrait for OutputStream {
     fn try_from_device(
         device: &cpal::Device,
     ) -> Result<(Self, OutputStreamHandle), StreamError> {
-        let default_config = device.default_output_config()?;
-        OutputStream::try_from_device_config(device, default_config)
+        match device.default_output_config() {
+            Ok(default_config) => {
+                OutputStream::try_from_device_config(device, default_config)
+            }
+            Err(e) => Err(StreamError::DefaultStreamConfigError(e)),
+        }
     }
 
 }
